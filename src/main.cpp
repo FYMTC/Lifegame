@@ -138,6 +138,9 @@ int main() {
     RenderWindow window;
     window.create(VideoMode(Vector2u(width, height)), sf::String(L"生命游戏"));
     window.setFramerateLimit(120);
+    // 设置固定逻辑视图，防止拉伸
+    sf::View fixedView(sf::FloatRect(sf::Vector2f(0.f, 0.f), sf::Vector2f(static_cast<float>(width), static_cast<float>(height))));
+    window.setView(fixedView);
 
     bool isRunning = false;
     bool mouseDown = false;
@@ -152,26 +155,33 @@ int main() {
                 window.close();
             }
 
+            if (e.is<Event::Resized>()) {
+                // 保持视图比例不变，防止拉伸和鼠标错位
+                window.setView(fixedView);
+            }
+
             if (auto mouseButton = e.getIf<Event::MouseButtonPressed>()) {
                 if (mouseButton->button == Mouse::Button::Left) {
-                    Vector2i mousePos = Mouse::getPosition(window);
+                    // 使用 mapPixelToCoords 保证鼠标坐标与逻辑坐标一致
+                    Vector2i pixelPos = Mouse::getPosition(window);
+                    Vector2f worldPos = window.mapPixelToCoords(pixelPos);
+                    int row = static_cast<int>(worldPos.y) / cellSize;
+                    int col = static_cast<int>(worldPos.x) / cellSize;
 
                     // Check if run button was clicked
-                    if (mousePos.x >= 10 && mousePos.x <= 90 && mousePos.y >= 10 && mousePos.y <= 40) {
+                    if (pixelPos.x >= 10 && pixelPos.x <= 90 && pixelPos.y >= 10 && pixelPos.y <= 40) {
                         isRunning = !isRunning;
                     }
                     // Check if speed up button was clicked
-                    else if (mousePos.x >= 100 && mousePos.x <= 180 && mousePos.y >= 10 && mousePos.y <= 40) {
+                    else if (pixelPos.x >= 100 && pixelPos.x <= 180 && pixelPos.y >= 10 && pixelPos.y <= 40) {
                         speed = max(10, speed - 2); // Decrease by 50ms, minimum 50ms
                     }
                     // Check if slow down button was clicked
-                    else if (mousePos.x >= 190 && mousePos.x <= 270 && mousePos.y >= 10 && mousePos.y <= 40) {
+                    else if (pixelPos.x >= 190 && pixelPos.x <= 270 && pixelPos.y >= 10 && pixelPos.y <= 40) {
                         speed = min(50, speed + 2); // Increase by 50ms, maximum 1000ms
                     }
                     else {
                         // Toggle cells
-                        int row = mousePos.y / cellSize;
-                        int col = mousePos.x / cellSize;
                         if (row >= 0 && row < board.size() && col >= 0 && col < board[0].size()) {
                             board[row][col] = 1 - board[row][col];
                         }
@@ -191,9 +201,10 @@ int main() {
             }
 
             if (auto mouseMove = e.getIf<Event::MouseMoved>(); mouseMove && mouseDown) {
-                Vector2i mousePos = Mouse::getPosition(window);
-                int row = mousePos.y / cellSize;
-                int col = mousePos.x / cellSize;
+                Vector2i pixelPos = Mouse::getPosition(window);
+                Vector2f worldPos = window.mapPixelToCoords(pixelPos);
+                int row = static_cast<int>(worldPos.y) / cellSize;
+                int col = static_cast<int>(worldPos.x) / cellSize;
                 if (row >= 0 && row < board.size() && col >= 0 && col < board[0].size()) {
                     // 插值填充上一个格子和当前格子之间的所有格子
                     if (lastRow != -1 && lastCol != -1) {
